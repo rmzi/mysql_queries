@@ -1,0 +1,60 @@
+Project #2 Written Answers
+--------------------------
+COMSW4111 - Intro to Databases
+Ramzi Abdoch, raa2148
+
+# Connection String
+
+mysql --local-infile -h cs4111.cuas5d9zztij.us-west-2.rds.amazonaws.com -P 3306 -u raa2148 -p project2
+
+# Notes
+
+mysql> SHOW VARIABLES LIKE 'innodb_page_size';
++------------------+-------+
+| Variable_name    | Value |
++------------------+-------+
+| innodb_page_size | 16384 |
++------------------+-------+
+1 row in set (0.11 sec)
+
+################
+## Question 1 ##
+################
+
+(a)
+
+SELECT COUNT(*) FROM R WHERE R.c <= 10
+
+	- R has 100,000 rows, and we want the number of rows in R that satisfy R.c <= 10.
+	- Because R is uniformly distributed, and bounded by [0,1000], we can assume that 
+	10 / 1000 or 1% of all rows are <= 10. 1% * 100,000 rows = 1000 rows
+
+(b)
+
+mysql> EXPLAIN SELECT COUNT(*) FROM R WHERE R.c <= 10;
++----+-------------+-------+------+---------------+------+---------+------+-------+-------------+
+| id | select_type | table | type | possible_keys | key  | key_len | ref  | rows  | Extra       |
++----+-------------+-------+------+---------------+------+---------+------+-------+-------------+
+|  1 | SIMPLE      | R     | ALL  | NULL          | NULL | NULL    | NULL | 97739 | Using where |
++----+-------------+-------+------+---------------+------+---------+------+-------+-------------+
+1 row in set (0.10 sec)
+
+	- Based on the output above, MySQL chose to iterate through all fields (type = ALL) and used the where statement to evaluate entries. It estimated that the plan would touch ~100,000 records (rows = 97739) which is consistent with the method of traversal.
+
+(c)
+
+	- This is the most straight-foward way of making this selection. If the data was clustered based on ranges (1-10, 11 - 20, etc), we could select the index corresponding to the correct cluster and returning the resulting list. While this would be a faster query, the process of creating those clusters would cause the system to iterate through all data entries and create separate tables, which would make the cost significantly higher. The method MySQL chose would be the best method if the query only needed to be made once, but if it was called many times, the clustering method would significantly decrease query time.
+
+	* M(R) = 100,000 -> M(Rclustered) = 100, M = Max # of records needed to evaluate to find result
+
+(d)
+
+mysql> EXPLAIN SELECT COUNT(*) FROM R WHERE R.C<=10;
++----+-------------+-------+-------+---------------+------+---------+------+------+--------------------------+
+| id | select_type | table | type  | possible_keys | key  | key_len | ref  | rows | Extra                    |
++----+-------------+-------+-------+---------------+------+---------+------+------+--------------------------+
+|  1 | SIMPLE      | R     | range | RC            | RC   | 5       | NULL | 1003 | Using where; Using index |
++----+-------------+-------+-------+---------------+------+---------+------+------+--------------------------+
+1 row in set (0.12 sec)
+
+	- MySQL chose to use the index provided and performed a range check on the indexes. This allowed the query to find the correct index then imply iterate through all rows w/ that index (rows = 1003). This is consistent with the 
